@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>[[Big Shot]] – Spamton NEO Dövüşü</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+body{display:flex;align-items:center;justify-content:center}
+canvas{width:100%;max-width:calc((100vh - 20px)*4/3);aspect-ratio:4/3;image-rendering:pixelated;background:#000;touch-action:none}
+</style></head><body>
+<canvas id="c" width="640" height="480"></canvas>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d'),W=640,H=480;
+const BOX={x:200,y:262,w:240,h:130};
+const FONT='bold 20px "Courier New",monospace';
+let S='menu',sel=0,sub=null,hp=90,MAXHP=90,tp=0,eh=6000,EMAX=6000,turn=0,items=3,t=0,
+ msg='* SPAMTON NEO belirdi! Teller sallanıyor.',mi=0,talk='',timer=0,
+ soul={x:320,y:330},inv=0,bul=[],sp=0,flash=0,dmgTxt=null,bar=0,barDir=1,hitDone=false,spamAngry=0,mercyOK=false,keys={};
+const acts=['Kontrol Et','Pazarlık Et','Telleri Kes'];
+const taunts=["HEY [[Çocuk]]! [[Big Shot]] OLMAK İSTER MİSİN?!","[[İNDİRİM]] [[İNDİRİM]] SADECE BUGÜN!!","SENİN [[KROMER]]İN NEREDE?!","[[PİPİS]] YAĞMURU!!","BENİ [[KANCADAN]] KURTAR!!","HAHAHA! [[HEART]] BENİM OLACAK!","[[ÖZEL]] FIRSAT!! 1 [[ÇOCUK]] ALANA 1 BEDAVA!"];
+function say(m){msg=m;mi=0}
+const btn=['DÖVÜŞ','EYLEM','EŞYA','MERHAMET'];
+function bx(i){return{x:14+i*156,y:418,w:146,h:52}}
+// ---------- input ----------
+let ptr=null;
+function pos(e){const r=C.getBoundingClientRect();return{x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height}}
+const ptrs={};
+let chg=0;function bigShot(){if(S==='attack'||S==='talk')pb.push({x:soul.x,y:soul.y-20,big:1})}
+let mine=false;const JB={x:90,y:444,r:30};let jv={x:0,y:0};
+function joy(p){const dx=p.x-JB.x,dy=p.y-JB.y,d=Math.hypot(dx,dy)||1,m=Math.min(d,JB.r*1.4)/(JB.r*1.4);jv={x:dx/d*m,y:dy/d*m}}
+C.addEventListener('pointerdown',e=>{C.setPointerCapture(e.pointerId);const p=pos(e);if((S==='attack'||S==='talk')&&p.y>400){if(p.x<300){ptrs[e.pointerId]='joy';joy(p)}else{ptrs[e.pointerId]='fire';shoot()}return}ptrs[e.pointerId]=p;tap(p)});
+C.addEventListener('pointermove',e=>{if(ptrs[e.pointerId]==='joy')joy(pos(e))});
+C.addEventListener('pointerup',e=>{if(ptrs[e.pointerId]==='joy')jv={x:0,y:0};delete ptrs[e.pointerId]});
+C.addEventListener('pointercancel',e=>{if(ptrs[e.pointerId]==='joy')jv={x:0,y:0};delete ptrs[e.pointerId]});
+// ---- ruh atışları (Big Shot) ----
+let pb=[],shootCd=0;
+function shoot(){if((S!=='attack'&&S!=='talk')||shootCd>0)return;shootCd=.22;pb.push({x:soul.x,y:soul.y-12})}
+function upPB(dt){
+ shootCd-=dt;if(S!=='attack'&&S!=='talk')chg=0;else if(Object.values(ptrs).includes('fire')||keys[' ']||keys.z||keys.Z)chg+=dt;else{if(chg>=.8)bigShot();chg=0}
+ for(const s of pb){s.y-=520*dt;
+  const bw=s.big?95:70;if(!s.dead&&s.y<200&&s.y>55&&Math.abs(s.x-320)<bw){s.dead=1;const d=s.big?(mine?200:130):(mine?30:18);eh=Math.max(0,eh-d);flash=.15;tp=Math.min(100,tp+1);dmgTxt={v:d,t:.4};if(eh<=0)S='win'}}
+ pb=pb.filter(s=>!s.dead&&s.y>-20);
+}
+addEventListener('keydown',e=>{keys[e.key]=1;if(['z','Z','Enter',' '].includes(e.key))tap(null,'ok');if(['x','X'].includes(e.key))tap(null,'back');
+ if(S==='menu'&&!sub){if(e.key==='ArrowRight')sel=(sel+1)%4;if(e.key==='ArrowLeft')sel=(sel+3)%4}
+ else if(S==='menu'&&sub){if(e.key==='ArrowDown')sub.i=(sub.i+1)%sub.l.length;if(e.key==='ArrowUp')sub.i=(sub.i+sub.l.length-1)%sub.l.length}});
+addEventListener('keyup',e=>keys[e.key]=0);
+function inR(p,r){return p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h}
+function tap(p,k){
+ if(S==='over'||S==='win'){if(p||k)reset();return}
+ if(S==='menu'&&!sub){
+  if(p){for(let i=0;i<4;i++)if(inR(p,bx(i))){sel=i;choose();return}}
+  else if(k==='ok')choose();
+ }else if(S==='menu'&&sub){
+  if(k==='back'){sub=null;return}
+  if(p){if(p.y>400){sub=null;return}
+   for(let i=0;i<sub.l.length;i++)if(p.x>230&&p.x<560&&p.y>262+i*34&&p.y<296+i*34){sub.i=i;pick();return}}
+  else if(k==='ok')pick();
+ }else if(S==='fight'){strike()}
+ else if(S==='attack'&&k==='ok'){shoot()}
+ else if(S==='text'&&(p||k==='ok')){if(mi<msg.length)mi=msg.length;else{S='menu'}}
+}
+function choose(){
+ if(sel===0){mine=true;S='attack';timer=6;bul=[];pb=[];soul.x=BOX.x+BOX.w/2;soul.y=BOX.y+BOX.h-20;say('')}
+ else if(sel===1)sub={t:'act',l:acts,i:0};
+ else if(sel===2)sub={t:'item',l:['Kuru Ekmek x'+items+' (+40 HP)'],i:0};
+ else sub={t:'mercy',l:['Merhamet','Kaç'],i:0};
+}
+function pick(){
+ const s=sub;sub=null;
+ if(s.t==='act'){
+  if(s.i===0)say('* SPAMTON NEO - SALDIRI 99 SAVUNMA 0\n* Tellerle asılı. Parıltılı. Pahalı.'),endText();
+  if(s.i===1){say('* Pazarlık ettin! "[[İNDİRİM]]" diye bağırıyor.\n* Biraz sakinleşti (TP +20).');tp=Math.min(100,tp+20);endText()}
+  if(s.i===2){if(tp>=30){tp-=30;hurt(350);say('* Telleri kestin! SPAMTON NEO acıyla çığlık attı!');endText()}else{say('* TP yetmiyor (30 gerek). Pazarlık yap!');S='text';return}}
+ }else if(s.t==='item'){
+  if(items>0){items--;hp=Math.min(MAXHP,hp+40);say('* Kuru Ekmek yedin. HP +40!');endText()}else{say('* Hiç eşya kalmadı.');S='text'}
+ }else{
+  if(s.i===0){if(eh<EMAX*0.3){S='win';return}say('* Merhamet etmek istedin ama SPAMTON NEO henüz\n  yeterince yorulmadı. (HP %30 altı olmalı)');endText()}
+  else{say('* Kaçmaya çalıştın... Teller seni geri çekti!');endText()}
+ }
+}
+function endText(){S='text';textNext=true}
+let textNext=false;
+function strike(){
+ if(hitDone)return;hitDone=true;
+ const q=Math.max(0,1-Math.abs(bar-0.5)*2);
+ const d=Math.round(100+q*420);hurt(d);tp=Math.min(100,tp+Math.round(q*25));
+ say('* '+d+' hasar verdin!');
+ setTimeout(()=>{S='text'},650);
+}
+function hurt(d){eh=Math.max(0,eh-d);flash=0.5;dmgTxt={v:d,t:1};if(eh<=0)setTimeout(()=>S='win',700)}
+function startTurn(){
+ S='talk';talk=taunts[(Math.random()*taunts.length)|0];mi=0;timer=2.2;bul=[];pb=[];sp=0;soul.x=BOX.x+BOX.w/2;soul.y=BOX.y+BOX.h/2;pat=turn%5;turn++;
+ if(eh<EMAX*.3)talk='[[SON]] [[İNDİRİM]]!! HEPSİNİ AL!!'
+}
+let pat=0;
+function reset(){location.reload()}
+// ---------- bullets ----------
+function spawn(dt){
+ sp-=dt;if(sp>0)return;
+ const bx0=BOX.x,bx1=BOX.x+BOX.w;
+ if(pat===0){sp=.14;bul.push({k:'pip',x:bx0+Math.random()*BOX.w,y:BOX.y-10,vx:0,vy:210+Math.random()*80,r:8,ph:Math.random()*6})}
+ else if(pat===1){sp=.55;const y=BOX.y+20+Math.random()*(BOX.h-40);bul.push({k:'laser',y,h:22,w:0,t:0,f:.45,life:.3});if(Math.random()<.5)bul.push({k:'laser',y:BOX.y+20+Math.random()*(BOX.h-40),h:22,w:0,t:0,f:.55,life:.3})}
+ else if(pat===2){sp=.6;const x=bx0+Math.random()*BOX.w;bul.push({k:'string',x,t:0,f:.6,life:.4})}
+ else if(pat===3){sp=.35;const a=Math.atan2(soul.y-60,soul.x-320);bul.push({k:'head',x:320,y:90,vx:Math.cos(a)*250,vy:Math.sin(a)*250,r:9})}
+ else{sp=.2;const side=Math.random()<.5;bul.push({k:'heart',x:side?bx0-10:bx1+10,y:BOX.y+Math.random()*BOX.h,vx:side?180:-180,vy:0,r:8,ph:0})}
+}
+function upBul(dt){
+ for(const b of bul){
+  if(b.k==='laser'||b.k==='string'){b.t+=dt;if(b.t>b.f)b.life-=dt;continue}
+  b.x+=b.vx*dt;b.y+=b.vy*dt;
+  if(b.k==='pip'){b.ph+=dt*4;b.x+=Math.sin(b.ph)*40*dt}
+  if(b.k==='heart'){b.ph+=dt*5;b.y+=Math.sin(b.ph)*90*dt}
+ }
+ bul=bul.filter(b=>b.life===undefined?(b.y<H&&b.y>-40&&b.x>-40&&b.x<W+40):b.life>0);
+}
+function collide(){
+ if(inv>0)return;
+ for(const b of bul){
+  let h=false;
+  if(b.r){h=Math.hypot(b.x-soul.x,b.y-soul.y)<b.r+4}
+  else if(b.t>b.f){
+   if(b.k==='laser')h=Math.abs(soul.y-b.y)<b.h/2+3;
+   else h=Math.abs(soul.x-b.x)<10+3}
+  if(h){hp-=12;inv=.8;tp=Math.min(100,tp+4);if(hp<=0){hp=0;S='over'}break}
+ }
+}
+// ---------- loop ----------
+let last=performance.now();
+function loop(n){const dt=Math.min(.05,(n-last)/1000);last=n;t+=dt;update(dt);draw();requestAnimationFrame(loop)}
+function update(dt){
+ if(mi<msg.length)mi+=dt*45;
+ if(flash>0)flash-=dt;if(dmgTxt){dmgTxt.t-=dt;if(dmgTxt.t<=0)dmgTxt=null}
+ if(inv>0)inv-=dt;
+ if(S==='text'&&mi>=msg.length&&textNext){textNext=false;setTimeout(()=>{if(S==='text')startTurn()},700)}
+ if(S==='fight'&&!hitDone){bar+=barDir*dt*1.1;if(bar>=1){bar=1;barDir=-1}if(bar<=0){bar=0;barDir=1}}
+ if(S==='talk'){timer-=dt;upPB(dt);if(timer<=0){S='attack';timer=7.5}}
+ if(S==='attack'){
+  const v=170*dt;soul.x+=jv.x*190*dt;soul.y+=jv.y*190*dt;
+  if(keys.ArrowLeft)soul.x-=v;if(keys.ArrowRight)soul.x+=v;if(keys.ArrowUp)soul.y-=v;if(keys.ArrowDown)soul.y+=v;
+  soul.x=Math.max(BOX.x+8,Math.min(BOX.x+BOX.w-8,soul.x));soul.y=Math.max(BOX.y+8,Math.min(BOX.y+BOX.h-8,soul.y));
+  if(!mine)spawn(dt);upBul(dt);upPB(dt);collide();timer-=dt;
+  if(timer<=0&&S==='attack'&&mine){mine=false;startTurn()}else if(timer<=0&&S==='attack'){S='menu';say('* SPAMTON NEO teller üzerinde sallanıyor.');bul=[]}
+ }
+}
+// ---------- drawing ----------
+function poly(pts,fill,stroke){X.beginPath();pts.forEach((p,i)=>i?X.lineTo(p[0],p[1]):X.moveTo(p[0],p[1]));X.closePath();if(fill){X.fillStyle=fill;X.fill()}if(stroke){X.strokeStyle=stroke;X.lineWidth=2;X.stroke()}}
+function spamton(){
+ const cx=320,cy=130+Math.sin(t*2)*7,sh=flash>0?(Math.random()-.5)*10:0,x0=cx+sh;
+ // teller
+ X.strokeStyle='#f6a';X.lineWidth=2;
+ [[-90,-90],[-60,-90],[60,-90],[90,-90],[-20,-90],[20,-90]].forEach(([dx,dy])=>{X.beginPath();X.moveTo(x0+dx,0);X.lineTo(x0+dx*.8,cy-30);X.stroke()});
+ // kanatlar
+ const wv=Math.sin(t*4)*8;
+ [-1,1].forEach(s=>{
+  poly([[x0+s*30,cy-10],[x0+s*150,cy-70+wv],[x0+s*125,cy-10],[x0+s*165,cy+20+wv],[x0+s*110,cy+25],[x0+s*135,cy+70],[x0+s*40,cy+40]],'#ffd84a','#fff');
+  poly([[x0+s*40,cy],[x0+s*110,cy-35+wv],[x0+s*95,cy+10],[x0+s*55,cy+25]],'#f6c','#fff');
+ });
+ // gövde
+ poly([[x0-34,cy+30],[x0+34,cy+30],[x0+46,cy+105],[x0-46,cy+105]],'#111','#fff');
+ poly([[x0-9,cy+30],[x0+9,cy+30],[x0+14,cy+95],[x0,cy+105],[x0-14,cy+95]],'#f2c','#fff');
+ // kollar
+ X.strokeStyle='#fff';X.lineWidth=4;X.beginPath();X.moveTo(x0-34,cy+40);X.lineTo(x0-75,cy+60+Math.sin(t*3)*8);X.moveTo(x0+34,cy+40);X.lineTo(x0+75,cy+60-Math.sin(t*3)*8);X.stroke();
+ // kafa
+ X.fillStyle=flash>0?'#f66':'#fff';X.fillRect(x0-38,cy-48,76,70);
+ X.fillStyle='#000';X.fillRect(x0-38,cy-48,76,6);
+ // gözlük
+ X.strokeStyle='#fd3';X.lineWidth=4;
+ X.beginPath();X.arc(x0-16,cy-18,13,0,7);X.stroke();X.beginPath();X.arc(x0+16,cy-18,13,0,7);X.stroke();
+ X.fillStyle='#000';X.beginPath();X.arc(x0-16+Math.sin(t*2)*3,cy-18,5,0,7);X.fill();X.beginPath();X.arc(x0+16+Math.sin(t*2)*3,cy-18,5,0,7);X.fill();
+ // burun + ağız
+ poly([[x0,cy-12],[x0+11,cy+6],[x0-3,cy+6]],'#f6a');
+ X.fillStyle='#000';X.fillRect(x0-26,cy+8,52,12);X.fillStyle='#fff';
+ for(let i=0;i<7;i++)X.fillRect(x0-24+i*7.5,cy+8,4,6);
+}
+function draw(){
+ X.fillStyle='#000';X.fillRect(0,0,W,H);
+ // arka plan şeritleri
+ X.fillStyle='#1a0626';for(let i=0;i<8;i++)X.fillRect(0,(i*60+t*20)%260,W,2);
+ spamton();
+ if(dmgTxt){X.fillStyle='#f33';X.font='bold 34px monospace';X.textAlign='center';X.fillText(dmgTxt.v,320,100-(1-dmgTxt.t)*30);}
+ // düşman HP
+ X.fillStyle='#400';X.fillRect(20,12,150,10);X.fillStyle='#fd3';X.fillRect(20,12,150*eh/EMAX,10);
+ X.fillStyle='#fff';X.font='bold 14px monospace';X.textAlign='left';X.fillText('SPAMTON NEO',20,38);
+ // konuşma balonu
+ if(S==='talk'||S==='attack'&&timer>6.5){
+  X.fillStyle='#fff';X.fillRect(400,50,225,86);poly([[400,95],[380,105],[400,110]],'#fff');
+  X.fillStyle='#000';X.font='bold 14px monospace';wrap(talk,410,72,205,18);
+ }
+ // kutu
+ X.strokeStyle='#fff';X.lineWidth=5;
+ const big=(S==='attack'||S==='talk');
+ const bw=big?BOX:{x:14,y:262,w:612,h:130};
+ X.strokeRect(bw.x,bw.y,bw.w,bw.h);
+ X.fillStyle='#fff';X.textAlign='left';X.font=FONT;
+ if(S==='menu'&&!sub||S==='text'){wrap(msg.slice(0,mi|0),34,298,570,26)}
+ if(S==='menu'&&!sub&&false);
+ if(sub){X.fillStyle='#fff';X.font=FONT;sub.l.forEach((l,i)=>{X.fillStyle=i===sub.i?'#ff0':'#fff';X.fillText((i===sub.i?'♥ ':'  ')+l,60,288+i*34)});X.font='14px monospace';X.fillStyle='#888';X.fillText('(aşağıya dokun = geri)',390,382)}
+ if(S==='fight')drawBar();
+ if(S==='attack'||S==='talk')drawBul();
+ if(S==='attack'||S==='talk'){
+  if(inv<=0||((t*20)|0)%2){X.fillStyle='#ff0';heart(soul.x,soul.y,9)}
+ }
+ // ARAYÜZ
+ for(let i=0;i<4;i++){const b=bx(i);X.lineWidth=4;X.strokeStyle=(i===sel&&S==='menu')?'#ff0':'#f80';X.strokeRect(b.x,b.y,b.w,b.h);
+  X.fillStyle=X.strokeStyle;X.font='bold 18px monospace';X.textAlign='center';X.fillText(btn[i],b.x+b.w/2,b.y+33)}
+ if(S==='attack'||S==='talk'){X.fillStyle='#000';X.fillRect(10,412,620,64);X.fillStyle='#222';X.beginPath();X.arc(JB.x,JB.y,JB.r,0,7);X.fill();X.strokeStyle='#fd3';X.lineWidth=3;X.stroke();X.fillStyle='#fd3';X.beginPath();X.arc(JB.x+jv.x*JB.r,JB.y+jv.y*JB.r,13,0,7);X.fill();X.fillStyle=shootCd>0?'#a80':'#fd3';X.fillRect(330,418,296,52);X.fillStyle='#000';X.font='bold 16px monospace';X.textAlign='center';X.fillText('★ ATEŞ ET! [[BIG SHOT]] ★  (Z)',478,451);X.fillStyle='#f6c';X.fillRect(330,466,296*Math.min(1,chg/.8),4);if(chg>.15){X.strokeStyle=chg>=.8?'#fff':'#fd3';X.lineWidth=2;X.beginPath();X.arc(soul.x,soul.y,10+Math.min(chg,.8)*14+Math.sin(t*30)*2,0,7);X.stroke()}}
+ X.textAlign='left';X.fillStyle='#fff';X.font='bold 16px monospace';X.fillText('KRIS',16,410);
+ X.fillStyle='#600';X.fillRect(70,396,110,14);X.fillStyle='#fd3';X.fillRect(70,396,110*hp/MAXHP,14);
+ X.fillStyle='#fff';X.fillText(hp+'/'+MAXHP,190,410);
+ X.fillStyle='#fff';X.fillText('TP',360,410);X.fillStyle='#420';X.fillRect(390,396,120,14);X.fillStyle='#f80';X.fillRect(390,396,120*tp/100,14);X.fillStyle='#fff';X.fillText(tp+'%',520,410);
+ if(S==='over'||S==='win'){
+  X.fillStyle='rgba(0,0,0,.85)';X.fillRect(0,0,W,H);X.textAlign='center';X.font='bold 36px monospace';
+  X.fillStyle=S==='win'?'#fd3':'#f33';X.fillText(S==='win'?'KAZANDIN!':'OYUN BİTTİ',320,200);
+  X.font='bold 18px monospace';X.fillStyle='#fff';
+  X.fillText(S==='win'?'"[[ÇOK ŞEY]] [[ÖZGÜR]]..." teller koptu.':'"[[BİR GÜN]]... [[BIG SHOT]] OLACAKSIN!"',320,240);
+  X.fillText('Tekrar denemek için dokun',320,290);
+ }
+}
+function drawBar(){
+ const x=100,w=440,y=300,h=64;X.strokeStyle='#fff';X.lineWidth=3;X.strokeRect(x,y,w,h);
+ X.fillStyle='#252';X.fillRect(x+4,y+4,w-8,h-8);X.fillStyle='#4c4';X.fillRect(x+w/2-12,y+4,24,h-8);
+ const cx=x+4+bar*(w-8);X.fillStyle=hitDone?'#ff0':'#fff';X.fillRect(cx-5,y-6,10,h+12);
+ X.font='14px monospace';X.textAlign='center';X.fillStyle='#fff';X.fillText('ortaya denk gelince dokun!',320,y+h+24);X.textAlign='left';
+}
+function drawBul(){
+ for(const s of pb){const k=s.big?3:1;X.fillStyle='#fd3';X.fillRect(s.x-4*k,s.y-10*k,8*k,20*k);X.fillStyle='#fff';X.fillRect(s.x-1.5*k,s.y-8*k,3*k,16*k)}
+ for(const b of bul){
+  if(b.k==='laser'){const a=b.t>b.f;X.fillStyle=a?'#f3c':'rgba(255,255,0,.3)';X.fillRect(BOX.x,b.y-(a?b.h/2:2),BOX.w,a?b.h:4);if(a){X.fillStyle='#fff';X.fillRect(BOX.x,b.y-3,BOX.w,6)}}
+  else if(b.k==='string'){const a=b.t>b.f;X.fillStyle=a?'#fd3':'rgba(255,100,200,.35)';X.fillRect(b.x-(a?8:1),BOX.y,a?16:2,BOX.h);}
+  else if(b.k==='pip'){X.fillStyle='#fff';X.beginPath();X.ellipse(b.x,b.y,8,11,0,0,7);X.fill();X.fillStyle='#f6c';X.beginPath();X.arc(b.x,b.y+2,4,0,7);X.fill()}
+  else if(b.k==='head'){X.fillStyle='#fd3';X.beginPath();X.arc(b.x,b.y,b.r,0,7);X.fill();X.fillStyle='#000';X.fillRect(b.x-5,b.y-3,10,3);X.fillStyle='#f6c';X.fillRect(b.x-3,b.y+2,6,3)}
+  else{X.fillStyle='#f6c';heart(b.x,b.y,8)}
+ }
+ // kutu dışı mermileri kırp
+ X.fillStyle='#000';X.fillRect(0,BOX.y-5,BOX.x-3,BOX.h+10);X.fillRect(BOX.x+BOX.w+3,BOX.y-5,W,BOX.h+10);
+ X.strokeStyle='#fff';X.lineWidth=5;X.strokeRect(BOX.x,BOX.y,BOX.w,BOX.h);
+}
+function heart(x,y,s){X.beginPath();X.moveTo(x,y+s*.9);X.bezierCurveTo(x-s*1.6,y-s*.1,x-s*.8,y-s*1.1,x,y-s*.35);X.bezierCurveTo(x+s*.8,y-s*1.1,x+s*1.6,y-s*.1,x,y+s*.9);X.fill()}
+function wrap(txt,x,y,w,lh){let yy=y;txt.split('\n').forEach(line=>{let cur='';line.split(' ').forEach(wd=>{const tst=cur?cur+' '+wd:wd;if(X.measureText(tst).width>w&&cur){X.fillText(cur,x,yy);yy+=lh;cur=wd}else cur=tst});X.fillText(cur,x,yy);yy+=lh})}
+startTurn();requestAnimationFrame(loop);
+</script></body></html>
